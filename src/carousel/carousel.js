@@ -6,8 +6,10 @@
 * AngularJS version of an image carousel.
 *
 */
-angular.module('ui.bootstrap.carousel', ['ui.bootstrap.transition'])
-.controller('CarouselController', ['$scope', '$timeout', '$transition', function ($scope, $timeout, $transition) {
+angular.module('ui.bootstrap.carousel', [])
+.controller('CarouselController', [
+         'carouselAnimator', '$scope', '$timeout',
+function (carouselAnimator ,  $scope ,  $timeout) {
   var self = this,
     slides = self.slides = $scope.slides = [],
     currentIndex = -1,
@@ -22,51 +24,28 @@ angular.module('ui.bootstrap.carousel', ['ui.bootstrap.transition'])
     if (direction === undefined) {
       direction = nextIndex > currentIndex ? 'next' : 'prev';
     }
+
     if (nextSlide && nextSlide !== self.currentSlide) {
-      if ($scope.$currentTransition) {
-        $scope.$currentTransition.cancel();
-        //Timeout so ng-class in template has time to fix classes for finished slide
-        $timeout(goNext);
-      } else {
         goNext();
-      }
     }
     function goNext() {
       // Scope has been destroyed, stop here.
       if (destroyed) { return; }
       //If we have a slide to transition from and we have a transition type and we're allowed, go
-      if (self.currentSlide && angular.isString(direction) && !$scope.noTransition && nextSlide.$element) {
-        //We shouldn't do class manip in here, but it's the same weird thing bootstrap does. need to fix sometime
-        nextSlide.$element.addClass(direction);
-        var reflow = nextSlide.$element[0].offsetWidth; //force reflow
-
-        //Set all other slides to stop doing their stuff for the new transition
-        angular.forEach(slides, function(slide) {
-          angular.extend(slide, {direction: '', entering: false, leaving: false, active: false});
+      var next = nextSlide.$element,
+          current = self.currentSlide && self.currentSlide.$element;
+      if (current && angular.isString(direction) && !$scope.noTransition) {
+        $scope.$currentTransition = true;
+        carouselAnimator.setActive(next, current, direction, function () {
+          $scope.$currentTransition = false;
         });
-        angular.extend(nextSlide, {direction: direction, active: true, entering: true});
-        angular.extend(self.currentSlide||{}, {direction: direction, leaving: true});
-
-        $scope.$currentTransition = $transition(nextSlide.$element, {});
-        //We have to create new pointers inside a closure since next & current will change
-        (function(next,current) {
-          $scope.$currentTransition.then(
-            function(){ transitionDone(next, current); },
-            function(){ transitionDone(next, current); }
-          );
-        }(nextSlide, self.currentSlide));
       } else {
-        transitionDone(nextSlide, self.currentSlide);
+        carouselAnimator.setActiveNoAnimate(next, current);
       }
       self.currentSlide = nextSlide;
       currentIndex = nextIndex;
       //every time you change slides, reset the timer
       restartTimer();
-    }
-    function transitionDone(next, current) {
-      angular.extend(next, {direction: '', active: true, leaving: false, entering: false});
-      angular.extend(current||{}, {direction: '', active: false, leaving: false, entering: false});
-      $scope.$currentTransition = null;
     }
   };
   $scope.$on('$destroy', function () {
@@ -290,4 +269,67 @@ function CarouselDemoCtrl($scope) {
       });
     }
   };
-});
+})
+
+.factory('carouselAnimator', [
+           '$animate',
+  function ($animate) {
+
+    var carouselAnimator = {
+      classes: {
+        active: 'active',
+        next: 'next',
+        prev: 'prev',
+        nextDirection: 'left',
+        prevDirection: 'right'
+      },
+      setActive: setActive,
+      setActiveNoAnimate: setActiveNoAnimate
+    };
+
+    return carouselAnimator;
+
+    function setActive(slide, curSlide, direction, done) {
+
+      var directionClass = carouselAnimator.classes[direction],
+          directionDirClass = carouselAnimator.classes[direction + 'Direction'],
+          animationWaitCount = 0;
+
+      animationWaitCount++;
+      slide.addClass(directionClass);
+      $animate.addClass(slide, directionDirClass, function () {
+        slide.removeClass( directionDirClass + ' ' + direction );
+        animationDone();
+      });
+
+      if (curSlide) {
+        animationWaitCount++;
+        $animate.addClass(curSlide, directionDirClass, function () {
+          curSlide.removeClass(directionDirClass);
+          animationDone();
+        });
+      }
+
+      function animationDone() {
+        if (!--animationWaitCount) {
+          setActiveNoAnimate(slide, curSlide);
+          if (done) {
+            done();
+          }
+        }
+      }
+    }
+
+    function setActiveNoAnimate(slide, curSlide) {
+      var activeClass = carouselAnimator.classes.active;
+
+      slide.addClass(activeClass);
+      if (curSlide) {
+        curSlide.removeClass(activeClass);
+      }
+    }
+
+  }
+])
+
+;
