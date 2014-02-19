@@ -12,27 +12,38 @@ angular.module('ui.bootstrap.collapse', [])
 
     return {
       link: function (scope, element, attrs) {
-        element.addClass(collapseConfig.inactiveClass);
+
+        element.on('$animate:before', function (e, data) {
+          if (data.className == collapseConfig.visibleClass) {
+            element.css({height: data.event == 'addClass' ? '0' : _fullHeight()});
+          }
+        });
+
+        element.on('$animate:after', function (e, data) {
+          if (data.className == collapseConfig.visibleClass) {
+            element.css({height: data.event == 'addClass' ? _fullHeight() : '0'});
+          }
+        });
+
+        element.on('$animate:close', function (e, data) {
+          if (data.className == collapseConfig.visibleClass) {
+            element.css({height: data.event == 'addClass' ? 'auto' : '0'});
+            animateDone();
+          }
+        });
+
+        function _fullHeight() {
+          return element[0].scrollHeight + 'px';
+        }
 
         function expand() {
           animateStart();
-          $animate.addClass(element, collapseConfig.visibleClass, function () {
-            // Doing height: '' to remove this property works too as "height:
-            // auto" is already in the Bootstrap stylesheet but may break
-            // compatibility with IE8 according to warning on
-            // http://api.jquery.com/css/
-            element.css({height: 'auto'});
-            animateDone();
-          });
+          $animate.addClass(element, collapseConfig.visibleClass);
         }
 
         function collapse() {
           animateStart();
-          $animate.removeClass(element, collapseConfig.visibleClass, function () {
-            // Read note above about IE8
-            element.css({height: '0'});
-            animateDone();
-          });
+          $animate.removeClass(element, collapseConfig.visibleClass);
         }
 
         function animateStart() {
@@ -56,34 +67,6 @@ angular.module('ui.bootstrap.collapse', [])
         });
       }
     };
-  }])
-
-  .animation('.collapsing', [
-             'collapseConfig',
-    function (collapseConfig) {
-
-    // Check for addition/removal of 'in' class
-    return {
-      beforeAddClass: _setZeroHeight,
-      addClass: _setFullHeight,
-      beforeRemoveClass: _setFullHeight,
-      removeClass: _setZeroHeight
-    };
-
-    function _setFullHeight(element, className, done) {
-      if (className == collapseConfig.visibleClass) {
-        element.css({height: element[0].scrollHeight + 'px'});
-      }
-      done();
-    }
-
-    function _setZeroHeight(element, className, done) {
-      if (className == collapseConfig.visibleClass) {
-        element.css({height: '0'});
-      }
-      done();
-    }
-
   }])
 
 ;
