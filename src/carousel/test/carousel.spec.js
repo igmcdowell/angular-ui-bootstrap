@@ -14,15 +14,15 @@ describe('carousel', function() {
   }));
   beforeEach(module('template/carousel/carousel.html', 'template/carousel/slide.html'));
 
-  var $rootScope, $compile, $controller, $timeout;
-  beforeEach(inject(function(_$rootScope_, _$compile_, _$controller_, _$timeout_) {
-    $rootScope = _$rootScope_;
-    $compile = _$compile_;
-    $controller = _$controller_;
-    $timeout = _$timeout_;
-  }));
-
   describe('basics', function() {
+    var $rootScope, $compile, $controller, $timeout;
+    beforeEach(inject(function(_$rootScope_, _$compile_, _$controller_, _$timeout_) {
+      $rootScope = _$rootScope_;
+      $compile = _$compile_;
+      $controller = _$controller_;
+      $timeout = _$timeout_;
+    }));
+
     var elm, scope;
     beforeEach(function() {
       scope = $rootScope.$new();
@@ -266,6 +266,13 @@ describe('carousel', function() {
   });
 
   describe('controller', function() {
+    var $rootScope, $controller, $timeout;
+    beforeEach(inject(function(_$rootScope_, _$controller_, _$timeout_) {
+      $rootScope = _$rootScope_;
+      $controller = _$controller_;
+      $timeout = _$timeout_;
+    }));
+
     var scope, ctrl;
     //create an array of slides and add to the scope
     var slides = [{'content':1},{'content':2},{'content':3},{'content':4}];
@@ -341,4 +348,131 @@ describe('carousel', function() {
       });
     });
   });
+
+  describe('animator', function() {
+    var elm, scope, slideElms, carouselAnimator, carouselAnimatorClasses, $animate;
+
+    beforeEach(module('ngAnimateMock'));
+
+    beforeEach(inject(function(_carouselAnimator_, _$animate_, $rootScope, $compile) {
+      carouselAnimator = _carouselAnimator_;
+      carouselAnimatorClasses = carouselAnimator.classes;
+
+      $animate = _$animate_;
+
+      $animate.queue = [];
+
+      scope = $rootScope.$new();
+      scope.noTransition = false;
+      scope.slides = [
+        {active:false,content:'one'},
+        {active:false,content:'two'}
+      ];
+      elm = $compile(
+        '<carousel no-transition="noTransition">' +
+          '<slide ng-repeat="slide in slides" active="slide.active">' +
+            '{{slide.content}}' +
+          '</slide>' +
+        '</carousel>'
+      )(scope);
+      scope.$apply();
+
+      slideElms = elm.find('.item');
+    }));
+
+    function findElementAnimations(element, queue) {
+      var node = element[0];
+      var animations = [];
+      for(var i = 0; i < queue.length; i++) {
+        var animation = queue[i];
+        if(animation.element[0] == node) {
+          animations.push(animation);
+        }
+      }
+      return animations;
+    }
+
+    function assertValidAnimation(animation, event, className) {
+      expect(animation.event).toBe(event);
+      expect(animation.args[1]).toBe(className);
+    }
+
+    it('should support noTransition attribute', function() {
+      spyOn(carouselAnimator, 'setActive').andCallThrough();
+      spyOn(carouselAnimator, 'setActiveNoAnimate').andCallThrough();
+      scope.noTransition = true;
+      scope.$apply('slides[1].active=true');
+      expect(carouselAnimator.setActive).not.toHaveBeenCalled();
+      assertSetActiveNoAnimate(slideElms[1], slideElms[0]);
+
+      scope.$apply('slides[0].active=true');
+      expect(carouselAnimator.setActive).not.toHaveBeenCalled();
+      assertSetActiveNoAnimate(slideElms[0], slideElms[1]);
+
+      function assertSetActiveNoAnimate(next, current) {
+        expect(carouselAnimator.setActiveNoAnimate).toHaveBeenCalled();
+
+        var mostRecentCallArgs = carouselAnimator.setActiveNoAnimate.mostRecentCall.args;
+        expect(mostRecentCallArgs[0][0]).toBe(next);
+        expect(mostRecentCallArgs[1][0]).toBe(current);
+      }
+    });
+
+    it('should call animator methods', function() {
+      spyOn(carouselAnimator, 'setActive').andCallThrough();
+      scope.$apply('slides[1].active=true');
+      assertSetActive(slideElms[1], slideElms[0], 'next');
+
+      scope.$apply('slides[0].active=true');
+      assertSetActive(slideElms[0], slideElms[1], 'prev');
+
+      function assertSetActive(next, current, direction) {
+        expect(carouselAnimator.setActive).toHaveBeenCalled();
+
+        var mostRecentCallArgs = carouselAnimator.setActive.mostRecentCall.args;
+        expect(mostRecentCallArgs[0][0]).toBe(next);
+        expect(mostRecentCallArgs[1][0]).toBe(current);
+        expect(mostRecentCallArgs[2]).toBe(direction);
+      }
+    });
+
+    it('should animate classes correctly', function() {
+      $animate.queue = [];
+      scope.$apply('slides[1].active=true');
+      expect(slideElms.eq(1)).toHaveClass(carouselAnimatorClasses.next);
+      $animate.triggerCallbacks();
+
+      assertAnimateDirection(slideElms.eq(0), 'next');
+      assertAnimateDirection(slideElms.eq(1), 'next');
+
+      // Set up active classes correctly
+      expect(slideElms.eq(1)).toHaveClass(carouselAnimatorClasses.active);
+      expect(slideElms.eq(0)).not.toHaveClass(carouselAnimatorClasses.active);
+
+      $animate.queue = [];
+      scope.$apply('slides[0].active=true');
+      expect(slideElms.eq(0)).toHaveClass(carouselAnimatorClasses.prev);
+      $animate.triggerCallbacks();
+
+      assertAnimateDirection(slideElms.eq(0), 'prev');
+      assertAnimateDirection(slideElms.eq(1), 'prev');
+
+      // Set up active classes correctly
+      expect(slideElms.eq(0)).toHaveClass(carouselAnimatorClasses.active);
+      expect(slideElms.eq(1)).not.toHaveClass(carouselAnimatorClasses.active);
+
+      function assertAnimateDirection(element, direction) {
+        var animations = findElementAnimations(element, $animate.queue);
+
+        assertValidAnimation(animations[0], 'addClass', carouselAnimatorClasses[direction + 'Direction']);
+        expect(animations.length).toBe(1);
+
+        // Clean up animation classes
+        expect(element).not.toHaveClass(carouselAnimatorClasses[direction]);
+        expect(element).not.toHaveClass(carouselAnimatorClasses[direction + 'Direction']);
+      }
+    });
+
+  });
+
 });
