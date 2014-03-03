@@ -270,11 +270,16 @@ describe('carousel', function() {
     //create an array of slides and add to the scope
     var slides = [{'content':1},{'content':2},{'content':3},{'content':4}];
 
+    /* carouselAnimator makes use of these class methods */
+    function createElementNodeSpy() {
+      return jasmine.createSpyObj('element', ['addClass', 'removeClass']);
+    }
+
     beforeEach(function() {
       scope = $rootScope.$new();
       ctrl = $controller('CarouselController', {$scope: scope, $element: null});
       for(var i = 0;i < slides.length;i++){
-        ctrl.addSlide(slides[i]);
+        ctrl.addSlide(slides[i], createElementNodeSpy());
       }
     });
 
@@ -292,7 +297,7 @@ describe('carousel', function() {
       it('should add new slide and change active to true if active is true on the added slide', function() {
         var newSlide = {active: true};
         expect(ctrl.slides.length).toBe(4);
-        ctrl.addSlide(newSlide);
+        ctrl.addSlide(newSlide, createElementNodeSpy());
         expect(ctrl.slides.length).toBe(5);
         expect(ctrl.slides[4].active).toBe(true);
         expect(ctrl.slides[0].active).toBe(false);
@@ -301,7 +306,7 @@ describe('carousel', function() {
       it('should add a new slide and not change the active slide', function() {
         var newSlide = {active: false};
         expect(ctrl.slides.length).toBe(4);
-        ctrl.addSlide(newSlide);
+        ctrl.addSlide(newSlide, createElementNodeSpy());
         expect(ctrl.slides.length).toBe(5);
         expect(ctrl.slides[4].active).toBe(false);
         expect(ctrl.slides[0].active).toBe(true);

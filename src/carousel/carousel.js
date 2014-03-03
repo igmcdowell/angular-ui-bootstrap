@@ -42,6 +42,10 @@ function (carouselAnimator ,  $scope ,  $timeout) {
       } else {
         carouselAnimator.setActiveNoAnimate(next, current);
       }
+      if (self.currentSlide) {
+        self.currentSlide.active = false;
+      }
+      nextSlide.active = true;
       self.currentSlide = nextSlide;
       currentIndex = nextIndex;
       //every time you change slides, reset the timer
