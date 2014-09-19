@@ -1,4 +1,4 @@
-angular.module('ui.bootstrap.modal', ['ui.bootstrap.transition'])
+angular.module('ui.bootstrap.modal', [])
 
 /**
  * A helper, internal data structure that acts as a map but also allows getting / removing
@@ -131,8 +131,8 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.transition'])
     };
   })
 
-  .factory('$modalStack', ['$transition', '$timeout', '$document', '$compile', '$rootScope', '$$stackedMap',
-    function ($transition, $timeout, $document, $compile, $rootScope, $$stackedMap) {
+  .factory('$modalStack', ['$animate', '$timeout', '$document', '$compile', '$rootScope', '$$stackedMap',
+    function ($animate, $timeout, $document, $compile, $rootScope, $$stackedMap) {
 
       var OPENED_MODAL_CLASS = 'modal-open';
 
@@ -166,8 +166,7 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.transition'])
         openedWindows.remove(modalInstance);
 
         //remove window DOM element
-        removeAfterAnimate(modalWindow.modalDomEl, modalWindow.modalScope, 300, function() {
-          modalWindow.modalScope.$destroy();
+        removeAfterAnimate(modalWindow.modalDomEl, modalWindow.modalScope, function() {
           body.toggleClass(OPENED_MODAL_CLASS, openedWindows.length() > 0);
           checkRemoveBackdrop();
         });
@@ -177,8 +176,7 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.transition'])
           //remove backdrop if no longer needed
           if (backdropDomEl && backdropIndex() == -1) {
             var backdropScopeRef = backdropScope;
-            removeAfterAnimate(backdropDomEl, backdropScope, 150, function () {
-              backdropScopeRef.$destroy();
+            removeAfterAnimate(backdropDomEl, backdropScope, function () {
               backdropScopeRef = null;
             });
             backdropDomEl = undefined;
@@ -186,19 +184,15 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.transition'])
           }
       }
 
-      function removeAfterAnimate(domEl, scope, emulateTime, done) {
+      function removeAfterAnimate(domEl, scope, done) {
         // Closing animation
         scope.animate = false;
 
-        var transitionEndEventName = $transition.transitionEndEventName;
-        if (transitionEndEventName) {
+        if ($animate.enabled()) {
           // transition out
-          var timeout = $timeout(afterAnimating, emulateTime);
-
-          domEl.bind(transitionEndEventName, function () {
-            $timeout.cancel(timeout);
-            afterAnimating();
-            scope.$apply();
+          // TODO: use .one when upgrading to >= 1.2.21
+          domEl.on('$animate:close', function closeFn() {
+            $rootScope.$evalAsync(afterAnimating);
           });
         } else {
           // Ensure this call is async
@@ -212,6 +206,7 @@ angular.module('ui.bootstrap.modal', ['ui.bootstrap.transition'])
           afterAnimating.done = true;
 
           domEl.remove();
+          scope.$destroy();
           if (done) {
             done();
           }
