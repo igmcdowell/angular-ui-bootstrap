@@ -1,5 +1,9 @@
 angular.module('ui.bootstrap.modal', [])
 
+  .constant('modalConfig', {
+    animation: true
+  })
+
 /**
  * A helper, internal data structure that acts as a map but also allows getting / removing
  * elements in the LIFO order
@@ -57,22 +61,29 @@ angular.module('ui.bootstrap.modal', [])
 /**
  * A helper directive for the $modal service. It creates a backdrop element.
  */
-  .directive('modalBackdrop', ['$timeout', function ($timeout) {
+  .directive('modalBackdrop', ['$timeout', 'modalConfig', function ($timeout, modalConfig) {
     return {
       restrict: 'EA',
       replace: true,
       templateUrl: 'template/modal/backdrop.html',
-      link: function (scope, element, attrs) {
-        scope.backdropClass = attrs.backdropClass || '';
+      compile: function (tElement, tAttrs) {
+        tElement.addClass(tAttrs.backdropClass);
+        return linkFn;
+      },
+    };
 
+    function linkFn(scope, element, attrs) {
+      if (modalConfig.animation) {
         scope.animate = false;
 
         //trigger CSS transitions
         $timeout(function () {
           scope.animate = true;
         });
+      } else {
+        scope.animate = true;
       }
-    };
+    }
   }])
 
   .directive('modalWindow', ['$modalStack', '$timeout', function ($modalStack, $timeout) {
@@ -120,6 +131,18 @@ angular.module('ui.bootstrap.modal', [])
     };
   }])
 
+  .directive('modalAnimationClass', [
+             'modalConfig',
+    function (modalConfig) {
+      return {
+        compile: function (tElement, tAttrs) {
+          if (modalConfig.animation) {
+            tElement.addClass(tAttrs.modalAnimationClass);
+          }
+        }
+      };
+    }])
+
   .directive('modalTransclude', function () {
     return {
       link: function($scope, $element, $attrs, controller, $transclude) {
@@ -131,8 +154,8 @@ angular.module('ui.bootstrap.modal', [])
     };
   })
 
-  .factory('$modalStack', ['$animate', '$timeout', '$document', '$compile', '$rootScope', '$$stackedMap',
-    function ($animate, $timeout, $document, $compile, $rootScope, $$stackedMap) {
+  .factory('$modalStack', ['$animate', '$timeout', '$document', '$compile', '$rootScope', '$$stackedMap', 'modalConfig',
+    function ($animate, $timeout, $document, $compile, $rootScope, $$stackedMap, modalConfig) {
 
       var OPENED_MODAL_CLASS = 'modal-open';
 
@@ -185,10 +208,10 @@ angular.module('ui.bootstrap.modal', [])
       }
 
       function removeAfterAnimate(domEl, scope, done) {
-        // Closing animation
-        scope.animate = false;
+        if (modalConfig.animation && $animate.enabled()) {
+          // Closing animation
+          scope.animate = false;
 
-        if ($animate.enabled()) {
           // transition out
           domEl.on('$animate:close', function closeFn() {
             afterAnimating();
