@@ -19,9 +19,7 @@ function MainCtrl($scope, $http, $document, $modal, orderByFilter) {
       controller: 'SelectModulesCtrl',
       resolve: {
         modules: function() {
-          return $http.get(builderUrl + "/api/bootstrap").then(function(response) {
-            return response.data.modules;
-          });
+          return Object.keys(__mappings);
         }
       }
     });
