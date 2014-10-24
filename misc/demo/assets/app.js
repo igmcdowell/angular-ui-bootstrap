@@ -1,3 +1,4 @@
+/* global __mappings: false, __files: false, FastClick, smoothScroll */
 angular.module('ui.bootstrap.demo', ['ui.bootstrap', 'plunker', 'ngTouch'], function($httpProvider){
   FastClick.attach(document.body);
   delete $httpProvider.defaults.headers.common['X-Requested-With'];
@@ -53,12 +54,33 @@ var SelectModulesCtrl = function($scope, $modalInstance, modules) {
     $modalInstance.dismiss();
   };
 
-  $scope.download = function (selectedModules) {
-    var downloadUrl = builderUrl + "/api/bootstrap/download?";
-    angular.forEach(selectedModules, function(module) {
-      downloadUrl += "modules=" + module + "&";
-    });
-    return downloadUrl;
+  $scope.build = function (selectedModules) {
+    var jsContent =selectedModules
+    .map(function (module) {
+      return __mappings[module];
+    })
+    .reduce(function (toBuild, module) {
+      if (toBuild.indexOf(module.name) == -1) {
+        toBuild.push(module.name);
+      }
+
+      module.dependencies.forEach(function (depName) {
+        if (toBuild.indexOf(depName) == -1) {
+          toBuild.push(depName);
+        }
+      });
+      return toBuild;
+    }, [])
+    .reduce(function (buildFiles, module) {
+      return buildFiles.concat(__mappings[module].srcFiles).concat(__mappings[module].tpljsFiles);
+    }, [])
+    .map(function (buildFile) {
+      return __files[buildFile];
+    })
+    .join('\n')
+    ;
+
+    console.log(jsContent);
   };
 };
 
