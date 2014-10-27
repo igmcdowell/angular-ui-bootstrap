@@ -373,7 +373,8 @@ module.exports = function(grunt) {
     var jsFilename = 'dist/assets/raw-files.js';
     var genRawFilesJs = require('./misc/raw-files-generator');
 
-    genRawFilesJs(grunt, jsFilename, _.flatten(grunt.config('concat.dist_tpls.src')));
+    genRawFilesJs(grunt, jsFilename, _.flatten(grunt.config('concat.dist_tpls.src')),
+                  grunt.config('meta.banner'));
   });
 
   function setVersion(type, suffix) {

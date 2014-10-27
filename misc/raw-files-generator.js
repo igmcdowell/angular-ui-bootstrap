@@ -23,6 +23,8 @@ function getFiles(filePaths) {
 module.exports = function generateRawFilesJs(grunt, jsFilename, files, banner) {
   if (!banner) {
     banner = '';
+  } else {
+    banner = 'var __banner = ' + JSON.stringify(banner) + ';\n';
   }
   var filesJsContent = banner + getFiles(files);
   try {

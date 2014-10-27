@@ -1,4 +1,4 @@
-/* global __mappings: false, __files: false, FastClick, smoothScroll */
+/* global __banner: false, __mappings: false, __files: false, FastClick, smoothScroll */
 angular.module('ui.bootstrap.demo', ['ui.bootstrap', 'plunker', 'ngTouch'], function($httpProvider){
   FastClick.attach(document.body);
   delete $httpProvider.defaults.headers.common['X-Requested-With'];
@@ -55,32 +55,74 @@ var SelectModulesCtrl = function($scope, $modalInstance, modules) {
   };
 
   $scope.build = function (selectedModules) {
-    var jsContent =selectedModules
+
+    var srcModuleNames = selectedModules
     .map(function (module) {
       return __mappings[module];
     })
     .reduce(function (toBuild, module) {
-      if (toBuild.indexOf(module.name) == -1) {
-        toBuild.push(module.name);
-      }
+      addIfNotExists(toBuild, module.name);
 
       module.dependencies.forEach(function (depName) {
-        if (toBuild.indexOf(depName) == -1) {
-          toBuild.push(depName);
-        }
+        addIfNotExists(toBuild, depName);
       });
       return toBuild;
-    }, [])
+    }, []);
+
+    var srcModules = srcModuleNames
+    .map(function (moduleName) {
+      return __mappings[moduleName];
+    });
+
+    var srcJsContent = srcModules
     .reduce(function (buildFiles, module) {
-      return buildFiles.concat(__mappings[module].srcFiles).concat(__mappings[module].tpljsFiles);
+      return buildFiles.concat(module.srcFiles);
     }, [])
-    .map(function (buildFile) {
-      return __files[buildFile];
-    })
+    .map(getFileContent)
     .join('\n')
     ;
 
-    console.log(jsContent);
+    console.log(createNoTplFile(srcModuleNames, srcJsContent));
+
+    var tplModuleNames = srcModules
+    .reduce(function (tplModuleNames, module) {
+      return tplModuleNames.concat(module.tplModules);
+    }, []);
+
+    var tplJsContent = srcModules
+    .reduce(function (buildFiles, module) {
+      return buildFiles.concat(module.tpljsFiles);
+    }, [])
+    .map(getFileContent)
+    .join('\n')
+    ;
+
+    console.log(createWithTplFile(srcModuleNames, srcJsContent, tplModuleNames, tplJsContent));
+
+    function createNoTplFile(srcModuleNames, srcJsContent) {
+      return __banner + 'angular.module("ui.bootstrap", ' + JSON.stringify(srcModuleNames) + ');\n' +
+        srcJsContent;
+    }
+
+    function createWithTplFile(srcModuleNames, srcJsContent, tplModuleNames, tplJsContent) {
+      var depModuleNames = srcModuleNames.slice();
+      depModuleNames.push('ui.bootstrap.tpls');
+
+      return __banner + 'angular.module("ui.bootstrap", ' + JSON.stringify(depModuleNames) + ');\n' +
+        'angular.module("ui.bootstrap.tpls", [' + tplModuleNames.join(',') + ']);\n' +
+        srcJsContent + '\n' + tplJsContent;
+
+    }
+
+    function addIfNotExists(array, element) {
+      if (array.indexOf(element) == -1) {
+        array.push(element);
+      }
+    }
+
+    function getFileContent(fileName) {
+      return __files[fileName];
+    }
   };
 };
 
