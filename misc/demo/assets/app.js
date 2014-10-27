@@ -54,7 +54,8 @@ var SelectModulesCtrl = function($scope, $modalInstance, modules) {
     $modalInstance.dismiss();
   };
 
-  $scope.build = function (selectedModules) {
+  $scope.build = function (selectedModules, version) {
+    /* global JSZip, saveAs */
 
     var srcModuleNames = selectedModules
     .map(function (module) {
@@ -82,7 +83,7 @@ var SelectModulesCtrl = function($scope, $modalInstance, modules) {
     .join('\n')
     ;
 
-    console.log(createNoTplFile(srcModuleNames, srcJsContent));
+    var jsFile = createNoTplFile(srcModuleNames, srcJsContent);
 
     var tplModuleNames = srcModules
     .reduce(function (tplModuleNames, module) {
@@ -97,7 +98,13 @@ var SelectModulesCtrl = function($scope, $modalInstance, modules) {
     .join('\n')
     ;
 
-    console.log(createWithTplFile(srcModuleNames, srcJsContent, tplModuleNames, tplJsContent));
+    var jsTplFile = createWithTplFile(srcModuleNames, srcJsContent, tplModuleNames, tplJsContent);
+
+    var zip = new JSZip();
+    zip.file('ui-bootstrap-custom-' + version + '.js', jsFile);
+    zip.file('ui-bootstrap-custom-tpls-' + version + '.js', jsTplFile);
+
+    saveAs(zip.generate({type: 'blob'}), 'ui-bootstrap-custom-build.zip');
 
     function createNoTplFile(srcModuleNames, srcJsContent) {
       return __banner + 'angular.module("ui.bootstrap", ' + JSON.stringify(srcModuleNames) + ');\n' +
