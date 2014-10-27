@@ -75,6 +75,11 @@ var SelectModulesCtrl = function($scope, $modalInstance, modules) {
       return __mappings[moduleName];
     });
 
+    var srcModuleFullNames = srcModules
+    .map(function (module) {
+      return module.moduleName;
+    });
+
     var srcJsContent = srcModules
     .reduce(function (buildFiles, module) {
       return buildFiles.concat(module.srcFiles);
@@ -83,7 +88,7 @@ var SelectModulesCtrl = function($scope, $modalInstance, modules) {
     .join('\n')
     ;
 
-    var jsFile = createNoTplFile(srcModuleNames, srcJsContent);
+    var jsFile = createNoTplFile(srcModuleFullNames, srcJsContent);
 
     var tplModuleNames = srcModules
     .reduce(function (tplModuleNames, module) {
@@ -98,24 +103,26 @@ var SelectModulesCtrl = function($scope, $modalInstance, modules) {
     .join('\n')
     ;
 
-    var jsTplFile = createWithTplFile(srcModuleNames, srcJsContent, tplModuleNames, tplJsContent);
+    var jsTplFile = createWithTplFile(srcModuleFullNames, srcJsContent, tplModuleNames, tplJsContent);
 
     var zip = new JSZip();
-    zip.file('ui-bootstrap-custom-' + version + '.js', jsFile);
-    zip.file('ui-bootstrap-custom-tpls-' + version + '.js', jsTplFile);
+    zip.file('ui-bootstrap-custom-' + version + '.js', __banner + jsFile);
+    zip.file('ui-bootstrap-custom-' + version + '.min.js', __banner + uglify(jsFile));
+    zip.file('ui-bootstrap-custom-tpls-' + version + '.js', __banner + jsTplFile);
+    zip.file('ui-bootstrap-custom-tpls-' + version + '.min.js', __banner + uglify(jsTplFile));
 
     saveAs(zip.generate({type: 'blob'}), 'ui-bootstrap-custom-build.zip');
 
     function createNoTplFile(srcModuleNames, srcJsContent) {
-      return __banner + 'angular.module("ui.bootstrap", ' + JSON.stringify(srcModuleNames) + ');\n' +
+      return 'angular.module("ui.bootstrap", [' + srcModuleNames.join(',') + ']);\n' +
         srcJsContent;
     }
 
     function createWithTplFile(srcModuleNames, srcJsContent, tplModuleNames, tplJsContent) {
       var depModuleNames = srcModuleNames.slice();
-      depModuleNames.push('ui.bootstrap.tpls');
+      depModuleNames.unshift('"ui.bootstrap.tpls"');
 
-      return __banner + 'angular.module("ui.bootstrap", ' + JSON.stringify(depModuleNames) + ');\n' +
+      return 'angular.module("ui.bootstrap", [' + depModuleNames.join(',') + ']);\n' +
         'angular.module("ui.bootstrap.tpls", [' + tplModuleNames.join(',') + ']);\n' +
         srcJsContent + '\n' + tplJsContent;
 
@@ -129,6 +136,25 @@ var SelectModulesCtrl = function($scope, $modalInstance, modules) {
 
     function getFileContent(fileName) {
       return __files[fileName];
+    }
+
+    function uglify(js) {
+      /* global UglifyJS */
+
+      var ast = UglifyJS.parse(js);
+      ast.figure_out_scope();
+
+      var compressor = UglifyJS.Compressor();
+      var compressedAst = ast.transform(compressor);
+
+      compressedAst.figure_out_scope();
+      compressedAst.compute_char_frequency();
+      compressedAst.mangle_names();
+
+      var stream = UglifyJS.OutputStream();
+      compressedAst.print(stream);
+
+      return stream.toString();
     }
   };
 };
