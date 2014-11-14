@@ -17,16 +17,20 @@ function getFiles(filePaths) {
     .forEach(function (path) {
       files[path] = fs.readFileSync(path, 'utf8');
     });
-  return 'var __files = ' + JSON.stringify(files) + '\n';
+  return files;
 }
 
 module.exports = function generateRawFilesJs(grunt, jsFilename, files, banner) {
   if (!banner) {
     banner = '';
-  } else {
-    banner = 'var __banner = ' + JSON.stringify(banner) + ';\n';
   }
-  var filesJsContent = banner + getFiles(files);
+
+  var filesJsObject = {
+    banner: banner,
+    files: getFiles(files),
+  };
+
+  var filesJsContent = JSON.stringify(filesJsObject);
   try {
     fs.writeFileSync(jsFilename, filesJsContent);
   }

@@ -360,17 +360,17 @@ module.exports = function(grunt) {
 
   grunt.registerTask('makeModuleMappingFile', function () {
     var _ = grunt.util._;
-    var moduleMappingJs = 'dist/assets/module-mapping.js';
+    var moduleMappingJs = 'dist/assets/module-mapping.json';
     var moduleMappings = grunt.config('moduleFileMapping');
     var moduleMappingsMap = _.object(_.pluck(moduleMappings, 'name'), moduleMappings);
-    var jsContent = 'var __mappings = ' + JSON.stringify(moduleMappingsMap) + '\n';
+    var jsContent = JSON.stringify(moduleMappingsMap);
     grunt.file.write(moduleMappingJs, jsContent);
     grunt.log.writeln('File ' + moduleMappingJs.cyan + ' created.');
   });
 
   grunt.registerTask('makeRawFilesJs', function () {
     var _ = grunt.util._;
-    var jsFilename = 'dist/assets/raw-files.js';
+    var jsFilename = 'dist/assets/raw-files.json';
     var genRawFilesJs = require('./misc/raw-files-generator');
 
     genRawFilesJs(grunt, jsFilename, _.flatten(grunt.config('concat.dist_tpls.src')),

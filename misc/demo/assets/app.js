@@ -1,4 +1,4 @@
-/* global __banner: false, __mappings: false, __files: false, FastClick, smoothScroll */
+/* global FastClick, smoothScroll */
 angular.module('ui.bootstrap.demo', ['ui.bootstrap', 'plunker', 'ngTouch'], function($httpProvider){
   FastClick.attach(document.body);
   delete $httpProvider.defaults.headers.common['X-Requested-With'];
@@ -9,7 +9,39 @@ angular.module('ui.bootstrap.demo', ['ui.bootstrap', 'plunker', 'ngTouch'], func
       location.replace(el.id);
     });
   }
-}]);
+}]).factory('buildFilesService', function ($http, $q) {
+
+  var moduleMap;
+  var rawFiles;
+
+  return {
+    getModuleMap: getModuleMap,
+    getRawFiles: getRawFiles,
+    get: function () {
+      return $q.all({
+        moduleMap: getModuleMap(),
+        rawFiles: getRawFiles(),
+      });
+    }
+  };
+
+  function getModuleMap() {
+    return moduleMap ? $q.when(moduleMap) : $http.get('assets/module-mapping.json')
+      .then(function (result) {
+        moduleMap = result.data;
+        return moduleMap;
+      });
+  }
+
+  function getRawFiles() {
+    return rawFiles ? $q.when(rawFiles) : $http.get('assets/raw-files.json')
+      .then(function (result) {
+        rawFiles = result.data;
+        return rawFiles;
+      });
+  }
+
+});
 
 var builderUrl = "http://50.116.42.77:3001";
 
@@ -19,8 +51,11 @@ function MainCtrl($scope, $http, $document, $modal, orderByFilter) {
       templateUrl: 'buildModal.html',
       controller: 'SelectModulesCtrl',
       resolve: {
-        modules: function() {
-          return Object.keys(__mappings);
+        modules: function(buildFilesService) {
+          return buildFilesService.getModuleMap()
+            .then(function (moduleMap) {
+              return Object.keys(moduleMap);
+            });
         }
       }
     });
@@ -34,7 +69,7 @@ function MainCtrl($scope, $http, $document, $modal, orderByFilter) {
   };
 }
 
-var SelectModulesCtrl = function($scope, $modalInstance, modules) {
+var SelectModulesCtrl = function($scope, $modalInstance, modules, buildFilesService) {
   $scope.selectedModules = [];
   $scope.modules = modules;
 
@@ -60,62 +95,72 @@ var SelectModulesCtrl = function($scope, $modalInstance, modules) {
 
   $scope.build = function (selectedModules, version) {
     /* global JSZip, saveAs */
+    var moduleMap, rawFiles;
 
-    var srcModuleNames = selectedModules
-    .map(function (module) {
-      return __mappings[module];
-    })
-    .reduce(function (toBuild, module) {
-      addIfNotExists(toBuild, module.name);
+    buildFilesService.get().then(function (buildFiles) {
+      moduleMap = buildFiles.moduleMap;
+      rawFiles = buildFiles.rawFiles;
 
-      module.dependencies.forEach(function (depName) {
-        addIfNotExists(toBuild, depName);
+      generateBuild();
+    });
+
+    function generateBuild() {
+      var srcModuleNames = selectedModules
+      .map(function (module) {
+        return moduleMap[module];
+      })
+      .reduce(function (toBuild, module) {
+        addIfNotExists(toBuild, module.name);
+
+        module.dependencies.forEach(function (depName) {
+          addIfNotExists(toBuild, depName);
+        });
+        return toBuild;
+      }, []);
+
+      var srcModules = srcModuleNames
+      .map(function (moduleName) {
+        return moduleMap[moduleName];
       });
-      return toBuild;
-    }, []);
 
-    var srcModules = srcModuleNames
-    .map(function (moduleName) {
-      return __mappings[moduleName];
-    });
+      var srcModuleFullNames = srcModules
+      .map(function (module) {
+        return module.moduleName;
+      });
 
-    var srcModuleFullNames = srcModules
-    .map(function (module) {
-      return module.moduleName;
-    });
+      var srcJsContent = srcModules
+      .reduce(function (buildFiles, module) {
+        return buildFiles.concat(module.srcFiles);
+      }, [])
+      .map(getFileContent)
+      .join('\n')
+      ;
 
-    var srcJsContent = srcModules
-    .reduce(function (buildFiles, module) {
-      return buildFiles.concat(module.srcFiles);
-    }, [])
-    .map(getFileContent)
-    .join('\n')
-    ;
+      var jsFile = createNoTplFile(srcModuleFullNames, srcJsContent);
 
-    var jsFile = createNoTplFile(srcModuleFullNames, srcJsContent);
+      var tplModuleNames = srcModules
+      .reduce(function (tplModuleNames, module) {
+        return tplModuleNames.concat(module.tplModules);
+      }, []);
 
-    var tplModuleNames = srcModules
-    .reduce(function (tplModuleNames, module) {
-      return tplModuleNames.concat(module.tplModules);
-    }, []);
+      var tplJsContent = srcModules
+      .reduce(function (buildFiles, module) {
+        return buildFiles.concat(module.tpljsFiles);
+      }, [])
+      .map(getFileContent)
+      .join('\n')
+      ;
 
-    var tplJsContent = srcModules
-    .reduce(function (buildFiles, module) {
-      return buildFiles.concat(module.tpljsFiles);
-    }, [])
-    .map(getFileContent)
-    .join('\n')
-    ;
+      var jsTplFile = createWithTplFile(srcModuleFullNames, srcJsContent, tplModuleNames, tplJsContent);
 
-    var jsTplFile = createWithTplFile(srcModuleFullNames, srcJsContent, tplModuleNames, tplJsContent);
+      var zip = new JSZip();
+      zip.file('ui-bootstrap-custom-' + version + '.js', rawFiles.banner + jsFile);
+      zip.file('ui-bootstrap-custom-' + version + '.min.js', rawFiles.banner + uglify(jsFile));
+      zip.file('ui-bootstrap-custom-tpls-' + version + '.js', rawFiles.banner + jsTplFile);
+      zip.file('ui-bootstrap-custom-tpls-' + version + '.min.js', rawFiles.banner + uglify(jsTplFile));
 
-    var zip = new JSZip();
-    zip.file('ui-bootstrap-custom-' + version + '.js', __banner + jsFile);
-    zip.file('ui-bootstrap-custom-' + version + '.min.js', __banner + uglify(jsFile));
-    zip.file('ui-bootstrap-custom-tpls-' + version + '.js', __banner + jsTplFile);
-    zip.file('ui-bootstrap-custom-tpls-' + version + '.min.js', __banner + uglify(jsTplFile));
-
-    saveAs(zip.generate({type: 'blob'}), 'ui-bootstrap-custom-build.zip');
+      saveAs(zip.generate({type: 'blob'}), 'ui-bootstrap-custom-build.zip');
+    }
 
     function createNoTplFile(srcModuleNames, srcJsContent) {
       return 'angular.module("ui.bootstrap", [' + srcModuleNames.join(',') + ']);\n' +
@@ -139,7 +184,7 @@ var SelectModulesCtrl = function($scope, $modalInstance, modules) {
     }
 
     function getFileContent(fileName) {
-      return __files[fileName];
+      return rawFiles.files[fileName];
     }
 
     function uglify(js) {
